@@ -1,40 +1,51 @@
-# Grid-Nexus BESS Optimizer ⚡🔋
+# ⚡ Grid-Nexus BESS Optimizer
 
 [![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://grid-nexus-bess-optimizer-b8by7r8hfzkdh2uvnv7skk.streamlit.app/)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-An advanced Mixed-Integer Linear Programming (MILP) optimization engine designed for Battery Energy Storage System (BESS) arbitrage in the German Day-Ahead electricity market. This tool simulates market price dynamics, optimizes charge/discharge schedules to maximize economic returns, and features an interactive web dashboard built with Streamlit.
-
-🔗 **Live Application:** [Grid-Nexus BESS Optimizer on Streamlit](https://grid-nexus-bess-optimizer-b8by7r8hfzkdh2uvnv7skk.streamlit.app/)  
-📂 **GitHub Repository:** [Mohammadrezarefaei/grid-nexus-bess-optimizer](https://github.com/Mohammadrezarefaei/grid-nexus-bess-optimizer)
+An advanced Mixed-Integer Linear Programming (MILP) optimization engine designed for Battery Energy Storage Systems (BESS) market arbitrage in the German Day-Ahead electricity market.
 
 ---
 
-## 🚀 Key Features
-
-- **MILP Optimization Engine:** Powered by `PuLP`, formulated to optimize battery dispatch schedules against fluctuating hourly electricity prices.
-- **Economic Arbitrage Modeling:** Maximizes revenue by buying energy during low-price or negative-price periods and discharging during peak-price hours, accounting for round-trip efficiency losses.
-- **Interactive Web Dashboard:** Built with `Streamlit` and `Plotly`, allowing users to adjust battery parameters (capacity, max power, efficiency) in real-time and visualize financial performance.
-- **Automated Reporting:** Generates clean dispatch schedules, market price charts, and performance logs stored in structured output directories.
-- **Robust Testing Suite:** Comprehensive unit tests (`pytest`) ensuring mathematical correctness and solver reliability.
+## 🚀 Live Demo
+Experience the interactive web application deployed on Streamlit Cloud: 
+👉 **[Grid-Nexus BESS Optimizer App](https://grid-nexus-bess-optimizer-b8by7r8hfzkdh2uvnv7skk.streamlit.app/)**
 
 ---
 
-## 📂 Project Structure
+## 📊 Visuals & Outputs
 
+### Market Price Profile (Day-Ahead)
+![Market Prices](outputs/market_prices_chart.png)
+
+### BESS Optimal Dispatch & State of Charge (SoC)
+![BESS Dispatch](outputs/bess_dispatch_chart.png)
+
+---
+
+## 🛠️ Key Features
+- **MILP Optimization Engine:** Formulates and solves a Mixed-Integer Linear Program using PuLP to maximize daily revenue through energy arbitrage (buying low, selling high).
+- **Physical Constraints Management:** Strictly respects battery capacity, maximum C-rates, charging/discharging efficiencies, and State of Charge (SoC) boundary limits.
+- **Interactive Dashboard:** A clean, user-friendly Streamlit interface for adjusting parameters, running simulations, and visualizing dispatch strategies.
+- **Automated Testing Suite:** Integrated unit tests using `pytest` to ensure robust mathematical modeling and solver reliability.
+
+---
+
+## 📂 Repository Structure
 ```text
 grid-nexus-bess-optimizer/
-│
-├── data/                  # Raw and sample market price datasets (e.g., ENTSO-E samples)
-├── outputs/               # Generated optimization CSV reports and dispatch charts
-├── src/                   # Core source code
-│   └── optimization_engine.py  # MILP mathematical model & PuLP optimization logic
-├── tests/                 # Unit tests for the optimization logic
-│   └── test_optimizer.py  # Pytest suite
-│
-├── .gitignore             # Git ignore rules
-├── README.md              # Project documentation
-├── app.py                 # Streamlit web application entry point
-├── grid-nexus-bess-optimizer.ipynb # Exploratory data analysis & prototyping notebook
-└── requirements.txt       # Project dependencies
+├── data/
+│   └── entsoe_prices_sample.csv
+├── outputs/
+│   ├── bess_dispatch_chart.png
+│   ├── market_prices.csv
+│   ├── market_prices_chart.png
+│   └── optimization_results.csv
+├── src/
+│   └── optimization_engine.py
+├── tests/
+│   └── test_optimizer.py
+├── app.py
+├── requirements.txt
+└── README.md
