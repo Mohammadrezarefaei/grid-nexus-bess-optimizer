@@ -26,8 +26,8 @@ default_prices = [
 # Run optimization model
 timesteps = range(len(default_prices))
 model = pulp.LpProblem("Streamlit_BESS_Opt", pulp.LpMaximize)
-p_charge = pulp.LpVariable.dicts("Charge", timesteps, lowBound=0, upBound=max_power)
-p_discharge = pulp.LpVariable.dicts("Discharge", timesteps, lowBound=0, upBound=max_power)
+p_charge = pulp.LpVariable.dicts("Charge", timesteps, lowBound=0, upBound=max_power, cat='Continuous')
+p_discharge = pulp.LpVariable.dicts("Discharge", timesteps, lowBound=0, upBound=max_power, cat='Continuous')
 soc = pulp.LpVariable.dicts("SoC", range(len(default_prices) + 1), lowBound=0, upBound=capacity)
 is_charging = pulp.LpVariable.dicts("IsCharging", timesteps, cat='Binary')
 
