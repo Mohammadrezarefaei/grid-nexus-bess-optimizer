@@ -1,91 +1,42 @@
-import streamlit as st
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-import pulp
+# Grid-Nexus BESS Optimizer
 
-st.set_page_config(page_title="Grid-Nexus BESS Optimizer", page_icon="⚡", layout="wide")
+Welcome to the Grid-Nexus Battery Energy Storage System (BESS) Optimizer. This is a web application built with Streamlit that helps you find the most profitable charging and discharging strategy for a battery system based on dynamic electricity prices.
 
-st.title("⚡ Grid-Nexus: Multi-Market BESS Optimization Engine")
-st.markdown("Advanced MILP optimization tool for Day-Ahead arbitrage and battery dispatch management.")
+By using linear programming, the app calculates exactly when the battery should buy power from the grid and when it should sell it back to maximize overall profit. 
 
-# Sidebar parameters
-st.sidebar.header("⚙️ Battery Specifications")
-capacity = st.sidebar.slider("Energy Capacity (MWh)", 0.5, 10.0, 2.0, 0.5)
-max_power = st.sidebar.slider("Max Power (MW)", 0.25, 5.0, 1.0, 0.25)
-efficiency = st.sidebar.slider("Round-Trip Efficiency (%)", 80.0, 98.0, 92.0, 1.0) / 100.0
+## Key Features
 
-# Market prices profile and time index with fixed freq="h"
-@st.cache_data
-def load_data():
-    times = pd.date_range(start="2026-09-25", periods=24, freq="h")
-    prices = [
-        65, 55, 45, 40, 42, 50, 70, 90,    
-        80, 50, 30, 15, 10, 12, 20, 45,    
-        75, 110, 130, 120, 95, 80, 70, 60 
-    ]
-    return pd.DataFrame({"Timestamp": times, "Price": prices})
+* Interactive web interface to easily adjust battery parameters.
+* Customizable inputs for battery capacity, maximum power, round-trip efficiency, and initial State of Charge.
+* Fast linear optimization powered by the PuLP library.
+* Beautiful and interactive charts created with Plotly to visualize the electricity price, net battery power, and State of Charge over time.
+* Detailed data table showing the exact optimization results for each hour.
 
-df_market = load_data()
-default_prices = df_market["Price"].tolist()
+## How It Works
 
-# Run optimization model
-timesteps = range(len(default_prices))
-model = pulp.LpProblem("Streamlit_BESS_Opt", pulp.LpMaximize)
+The optimizer looks at a given timeline of electricity prices. It then creates a mathematical model to maximize the total revenue (money earned from discharging) minus the total cost (money spent on charging). The algorithm respects all physical limits of the battery, including its maximum power capacity and energy losses during the charge cycle.
 
-# Robust definition compatible with all PuLP versions
-p_charge = {t: pulp.LpVariable(f"Charge_{t}", cat='Continuous') for t in timesteps}
-p_discharge = {t: pulp.LpVariable(f"Discharge_{t}", cat='Continuous') for t in timesteps}
-soc = {t: pulp.LpVariable(f"SoC_{t}", cat='Continuous') for t in range(len(default_prices) + 1)}
-is_charging = {t: pulp.LpVariable(f"IsCharging_{t}", cat='Binary') for t in timesteps}
+## Installation and Local Setup
 
-model += pulp.lpSum(
-    default_prices[t] * (p_discharge[t] * np.sqrt(efficiency) - p_charge[t] / np.sqrt(efficiency)) 
-    for t in timesteps
-)
+If you want to run this project on your own computer, follow these simple steps:
 
-model += (soc[0] == capacity * 0.5)
-M = max_power * 2
+1. Clone this repository to your local machine.
+2. Open your terminal or command prompt in the project folder.
+3. Install the required Python packages by running:
+   `pip install -r requirements.txt`
+4. Start the application by running:
+   `streamlit run app.py`
 
-for t in timesteps:
-    model += (p_charge[t] >= 0)
-    model += (p_charge[t] <= max_power)
-    model += (p_discharge[t] >= 0)
-    model += (p_discharge[t] <= max_power)
-    
-    model += (soc[t+1] == soc[t] + p_charge[t] * np.sqrt(efficiency) - p_discharge[t] / np.sqrt(efficiency))
-    model += (p_charge[t] <= M * is_charging[t])
-    model += (p_discharge[t] <= M * (1 - is_charging[t]))
+Your default web browser will open automatically and display the app.
 
-for t in range(len(default_prices) + 1):
-    model += (soc[t] >= 0)
-    model += (soc[t] <= capacity)
+## Technologies Used
 
-model += (soc[len(default_prices)] >= capacity * 0.5)
-model.solve(pulp.PULP_CBC_CMD(msg=0))
+* Python
+* Streamlit for the frontend application
+* PuLP for linear programming and optimization
+* Plotly for interactive data visualization
+* Pandas and NumPy for data handling
 
-results = []
-for t in timesteps:
-    results.append({
-        "Hour": t,
-        "Timestamp": df_market["Timestamp"].iloc[t].strftime("%H:%M"),
-        "Price (€/MWh)": default_prices[t],
-        "Charge (MW)": p_charge[t].varValue,
-        "Discharge (MW)": p_discharge[t].varValue,
-        "SoC (MWh)": soc[t+1].varValue
-    })
-df_res = pd.DataFrame(results)
+## Future Improvements
 
-# Dashboard Layout
-st.subheader("📋 Optimization Results Summary")
-st.dataframe(df_res, use_container_width=True)
-
-st.subheader("📊 Optimal Dispatch vs Market Prices")
-fig, ax = plt.subplots(figsize=(10, 4))
-ax.bar(df_res['Timestamp'], df_res['Discharge (MW)'], color='green', alpha=0.7, label='Discharge (Selling)')
-ax.bar(df_res['Timestamp'], [-val for val in df_res['Charge (MW)']], color='red', alpha=0.7, label='Charge (Buying)')
-ax.set_ylabel('Power Dispatch (MW)')
-ax.set_xlabel('Time')
-plt.xticks(rotation=45)
-ax.legend()
-st.pyplot(fig)
+We plan to add more features soon, such as the ability to
