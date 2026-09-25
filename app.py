@@ -55,4 +55,4 @@ status = model.solve()
 
 # --- 4. نمایش نتایج ---
 if pulp.LpStatus[status] == "Optimal":
-    st.success(f
+  st.success(f"Optimization Successful! Total Profit: €{pulp.value(model.objective):.2f}")
