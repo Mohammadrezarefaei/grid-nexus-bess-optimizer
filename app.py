@@ -27,10 +27,10 @@ default_prices = [
 timesteps = range(len(default_prices))
 model = pulp.LpProblem("Streamlit_BESS_Opt", pulp.LpMaximize)
 
-# Using low_bound and up_bound for modern PuLP compatibility
-p_charge = {t: pulp.LpVariable(f"Charge_{t}", low_bound=0, up_bound=max_power, cat='Continuous') for t in timesteps}
-p_discharge = {t: pulp.LpVariable(f"Discharge_{t}", low_bound=0, up_bound=max_power, cat='Continuous') for t in timesteps}
-soc = {t: pulp.LpVariable(f"SoC_{t}", low_bound=0, up_bound=capacity, cat='Continuous') for t in range(len(default_prices) + 1)}
+# Robust definition without conflicting keyword arguments
+p_charge = {t: pulp.LpVariable(f"Charge_{t}", cat='Continuous') for t in timesteps}
+p_discharge = {t: pulp.LpVariable(f"Discharge_{t}", cat='Continuous') for t in timesteps}
+soc = {t: pulp.LpVariable(f"SoC_{t}", cat='Continuous') for t in range(len(default_prices) + 1)}
 is_charging = {t: pulp.LpVariable(f"IsCharging_{t}", cat='Binary') for t in timesteps}
 
 model += pulp.lpSum(
@@ -40,10 +40,21 @@ model += pulp.lpSum(
 
 model += (soc[0] == capacity * 0.5)
 M = max_power * 2
+
 for t in timesteps:
+    # Explicit bounds constraints
+    model += (p_charge[t] >= 0)
+    model += (p_charge[t] <= max_power)
+    model += (p_discharge[t] >= 0)
+    model += (p_discharge[t] <= max_power)
+    
     model += (soc[t+1] == soc[t] + p_charge[t] * np.sqrt(efficiency) - p_discharge[t] / np.sqrt(efficiency))
     model += (p_charge[t] <= M * is_charging[t])
     model += (p_discharge[t] <= M * (1 - is_charging[t]))
+
+for t in range(len(default_prices) + 1):
+    model += (soc[t] >= 0)
+    model += (soc[t] <= capacity)
 
 model += (soc[len(default_prices)] >= capacity * 0.5)
 model.solve(pulp.PULP_CBC_CMD(msg=0))
