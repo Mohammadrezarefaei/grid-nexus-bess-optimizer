@@ -33,11 +33,11 @@ default_prices = df_market["Price"].tolist()
 timesteps = range(len(default_prices))
 model = pulp.LpProblem("Streamlit_BESS_Opt", pulp.LpMaximize)
 
-# Robust definition: continuous variables default safely, binary uses LpBinary
+# Clean and robust variable definitions
 p_charge = {t: pulp.LpVariable(f"Charge_{t}") for t in timesteps}
 p_discharge = {t: pulp.LpVariable(f"Discharge_{t}") for t in timesteps}
 soc = {t: pulp.LpVariable(f"SoC_{t}") for t in range(len(default_prices) + 1)}
-is_charging = {t: pulp.LpVariable(f"IsCharging_{t}", cat=pulp.LpBinary) for t in timesteps}
+is_charging = {t: pulp.LpVariable(f"IsCharging_{t}", cat='Binary') for t in timesteps}
 
 model += pulp.lpSum(
     default_prices[t] * (p_discharge[t] * np.sqrt(efficiency) - p_charge[t] / np.sqrt(efficiency)) 
