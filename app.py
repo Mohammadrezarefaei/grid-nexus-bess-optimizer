@@ -1,89 +1,58 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
 import pulp
+import plotly.graph_objects as go
+import numpy as np
 
-st.set_page_config(page_title="Grid-Nexus BESS Optimizer", page_icon="⚡", layout="wide")
+# تنظیمات اولیه صفحه
+st.set_page_config(page_title="Grid-Nexus BESS Optimizer", layout="wide")
+st.title("🔋 Battery Energy Storage System (BESS) Optimizer")
 
-st.title("⚡ Grid-Nexus: Multi-Market BESS Optimization Engine")
-st.markdown("Advanced MILP optimization tool for Day-Ahead arbitrage and battery dispatch management.")
+# --- 1. پارامترهای ورودی باتری ---
+st.sidebar.header("BESS Parameters")
+capacity_kwh = st.sidebar.number_input("Capacity (kWh)", value=100.0)
+max_power_kw = st.sidebar.number_input("Max Power (kW)", value=50.0)
+efficiency = st.sidebar.slider("Round-trip Efficiency", 0.8, 1.0, 0.9)
+initial_soc = st.sidebar.slider("Initial SoC (%)", 0.0, 100.0, 50.0) / 100.0
 
-# Sidebar parameters
-st.sidebar.header("⚙️ Battery Specifications")
-# Ensure float type for bounds
-capacity = float(st.sidebar.slider("Energy Capacity (MWh)", 0.5, 10.0, 2.0, 0.5))
-max_power = float(st.sidebar.slider("Max Power (MW)", 0.25, 5.0, 1.0, 0.25))
-efficiency = float(st.sidebar.slider("Round-Trip Efficiency (%)", 80.0, 98.0, 92.0, 1.0)) / 100.0
+eff_c = np.sqrt(efficiency)
+eff_d = np.sqrt(efficiency)
 
-# Market prices profile and time index with fixed freq="h"
+# --- 2. آماده‌سازی داده‌ها ---
 @st.cache_data
 def load_data():
-    times = pd.date_range(start="2026-09-25", periods=24, freq="h")
-    prices = [
-        65, 55, 45, 40, 42, 50, 70, 90,    
-        80, 50, 30, 15, 10, 12, 20, 45,    
-        75, 110, 130, 120, 95, 80, 70, 60 
-    ]
+    # اصلاح فرکانس به 1h (حرف h کوچک برای نسخه‌های جدید پانداز)
+    times = pd.date_range(start="2026-09-25", periods=24, freq="1h")
+    prices = np.sin(np.linspace(0, 2 * np.pi, 24)) * 10 + 20 
     return pd.DataFrame({"Timestamp": times, "Price": prices})
 
-df_market = load_data()
-default_prices = df_market["Price"].tolist()
+df = load_data()
+timesteps = df["Timestamp"].tolist()
+prices = df["Price"].tolist()
+N = len(df)
 
-# Run optimization model
-timesteps = list(range(len(default_prices)))
+# --- 3. مدل‌سازی بهینه‌سازی ---
+st.subheader("Optimization Results")
+
 model = pulp.LpProblem("Streamlit_BESS_Opt", pulp.LpMaximize)
 
-# 100% POSITIONAL ARGUMENTS: (Name, LowerBound, UpperBound, Category)
-# This completely bypasses the TypeError caused by keyword arguments on Streamlit Cloud
-p_charge = {t: pulp.LpVariable(f"Charge_{t}", 0, max_power, pulp.LpContinuous) for t in timesteps}
-p_discharge = {t: pulp.LpVariable(f"Discharge_{t}", 0, max_power, pulp.LpContinuous) for t in timesteps}
-soc = {t: pulp.LpVariable(f"SoC_{t}", 0, capacity, pulp.LpContinuous) for t in range(len(default_prices) + 1)}
-is_charging = {t: pulp.LpVariable(f"IsCharging_{t}", 0, 1, pulp.LpBinary) for t in timesteps}
+# تعریف متغیرها با ایندکس عددی برای جلوگیری از خطای فرمت تاریخ
+p_charge = pulp.LpVariable.dicts("Charge", range(N), lowBound=0, upBound=max_power_kw, cat=pulp.LpContinuous)
+p_discharge = pulp.LpVariable.dicts("Discharge", range(N), lowBound=0, upBound=max_power_kw, cat=pulp.LpContinuous)
+soc = pulp.LpVariable.dicts("SoC", range(N), lowBound=0, upBound=capacity_kwh, cat=pulp.LpContinuous)
 
-model += pulp.lpSum(
-    default_prices[t] * (p_discharge[t] * np.sqrt(efficiency) - p_charge[t] / np.sqrt(efficiency)) 
-    for t in timesteps
-)
+# تابع هدف
+model += pulp.lpSum([prices[t] * (p_discharge[t] - p_charge[t]) for t in range(N)]), "Total_Profit"
 
-model += (soc[0] == capacity * 0.5)
-M = max_power * 2
+# محدودیت‌ها
+for t in range(N):
+    if t == 0:
+        model += soc[t] == (initial_soc * capacity_kwh) + (p_charge[t] * eff_c) - (p_discharge[t] / eff_d)
+    else:
+        model += soc[t] == soc[t-1] + (p_charge[t] * eff_c) - (p_discharge[t] / eff_d)
 
-for t in timesteps:
-    # Physical constraints
-    model += (soc[t+1] == soc[t] + p_charge[t] * np.sqrt(efficiency) - p_discharge[t] / np.sqrt(efficiency))
-    
-    # Big-M constraints for simultaneous charge/discharge prevention
-    model += (p_charge[t] <= M * is_charging[t])
-    model += (p_discharge[t] <= M * (1 - is_charging[t]))
+status = model.solve()
 
-model += (soc[len(default_prices)] >= capacity * 0.5)
-
-# Solve the model quietly
-model.solve(pulp.PULP_CBC_CMD(msg=0))
-
-results = []
-for t in timesteps:
-    results.append({
-        "Hour": t,
-        "Timestamp": df_market["Timestamp"].iloc[t].strftime("%H:%M"),
-        "Price (€/MWh)": default_prices[t],
-        "Charge (MW)": p_charge[t].varValue,
-        "Discharge (MW)": p_discharge[t].varValue,
-        "SoC (MWh)": soc[t+1].varValue
-    })
-df_res = pd.DataFrame(results)
-
-# Dashboard Layout
-st.subheader("📋 Optimization Results Summary")
-st.dataframe(df_res, use_container_width=True)
-
-st.subheader("📊 Optimal Dispatch vs Market Prices")
-fig, ax = plt.subplots(figsize=(10, 4))
-ax.bar(df_res['Timestamp'], df_res['Discharge (MW)'], color='green', alpha=0.7, label='Discharge (Selling)')
-ax.bar(df_res['Timestamp'], -df_res['Charge (MW)'], color='red', alpha=0.7, label='Charge (Buying)')
-ax.set_ylabel('Power Dispatch (MW)')
-ax.set_xlabel('Time')
-plt.xticks(rotation=45)
-ax.legend()
-st.pyplot(fig)
+# --- 4. نمایش نتایج ---
+if pulp.LpStatus[status] == "Optimal":
+    st.success(f
