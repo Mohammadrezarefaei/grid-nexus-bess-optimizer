@@ -27,11 +27,11 @@ default_prices = [
 timesteps = range(len(default_prices))
 model = pulp.LpProblem("Streamlit_BESS_Opt", pulp.LpMaximize)
 
-# Fixed LpVariable.dicts calls with explicit cat='Continuous' for PuLP compatibility
-p_charge = pulp.LpVariable.dicts("Charge", timesteps, lowBound=0, upBound=max_power, cat='Continuous')
-p_discharge = pulp.LpVariable.dicts("Discharge", timesteps, lowBound=0, upBound=max_power, cat='Continuous')
-soc = pulp.LpVariable.dicts("SoC", range(len(default_prices) + 1), lowBound=0, upBound=capacity, cat='Continuous')
-is_charging = pulp.LpVariable.dicts("IsCharging", timesteps, cat='Binary')
+# Safe definition for PuLP variables without keyword clashes
+p_charge = {t: pulp.LpVariable(f"Charge_{t}", lowBound=0, upBound=max_power, cat='Continuous') for t in timesteps}
+p_discharge = {t: pulp.LpVariable(f"Discharge_{t}", lowBound=0, upBound=max_power, cat='Continuous') for t in timesteps}
+soc = {t: pulp.LpVariable(f"SoC_{t}", lowBound=0, upBound=capacity, cat='Continuous') for t in range(len(default_prices) + 1)}
+is_charging = {t: pulp.LpVariable(f"IsCharging_{t}", cat='Binary') for t in timesteps}
 
 model += pulp.lpSum(
     default_prices[t] * (p_discharge[t] * np.sqrt(efficiency) - p_charge[t] / np.sqrt(efficiency)) 
