@@ -1,5 +1,6 @@
 streamlit
-pulp
 pandas
 numpy
 matplotlib
+pulp
+plotly
